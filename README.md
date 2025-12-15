@@ -1,72 +1,178 @@
-# MINI-PROJECT-ESP32-MQTT-USING-MOSQUITTO
-This IoT mini project demonstrates remote device monitoring and control using standard IoT communication protocols. An ESP32 communicates over Wi-Fi and uses the MQTT publish–subscribe model to send telemetry data and receive control commands, enabling real-time LED control.
-Step-by-Step Project Execution Flow
+Step 1️⃣: Download Mosquitto
+
+Open the official Mosquitto website:
+👉 https://mosquitto.org/download/
+
+Download the Windows installer:
+
+mosquitto-2.x.x-install-windows-x64.exe
 
 
-Step 1: Upload the Code
+During installation, make sure to select:
 
-First, upload the ESP32 MQTT code provided in the repository using the Arduino IDE.
+✅ Install as service
 
-Step 2: Place the Configuration File
+✅ Add Mosquitto to PATH
 
-Place the config.h file in the same directory where the ESP32 MQTT source file (.ino) is located.
+Step 2️⃣: Configure Mosquitto
 
-Step 3: Open the Configuration File
+Open the following file as Administrator:
 
-Open the config.h file to update the required configuration parameters.
+C:\Program Files\mosquitto\mosquitto.conf
 
-Step 4: Configure Wi-Fi Credentials
 
-In config.h, provide the Wi-Fi credentials:
+Delete everything inside the file.
 
-Set WIFI_SSID to the Wi-Fi network or mobile hotspot name
+Paste only the following configuration:
 
-Set WIFI_PASSWORD to the corresponding password
+# ===== Mosquitto minimal config for ESP32 =====
 
-The Wi-Fi network must be the same for both the ESP32 and the laptop/PC.
+listener 1883
+allow_anonymous true
 
-Step 5: Establish Wi-Fi Connection
+log_type all
 
-Using the provided Wi-Fi credentials, the ESP32 connects to the Wi-Fi network, which enables communication between the ESP32 and the laptop/PC.
 
-Step 6: Configure MQTT Broker Details
+Save and close the file.
+(No bind_address, no extra listeners, no duplicate entries.)
 
-In config.h, update the MQTT broker IP address using the IP address of the laptop/PC where the Mosquitto broker is running.
+Step 3️⃣: Find PC IP Address
 
-Step 7: Connect ESP32 to PC
+Open Command Prompt.
 
-Connect the ESP32 board to the laptop/PC using a USB cable.
+Run:
 
-Step 8: Select Board and Port
+ipconfig
 
-Select the appropriate ESP32 board and COM port in the Arduino IDE.
 
-Step 9: Upload the Code to ESP32
+Copy the IPv4 address of your active Wi-Fi network.
 
-Upload the code to the ESP32 after completing all configuration changes.
+Paste this IP address into the ESP32 config.h file:
 
-Step 10: Verify Serial Monitor Output
+MQTT_BROKER = "<PC_IP_ADDRESS>"
+MQTT_PORT   = 1883
 
-Open the Serial Monitor to verify:
+CMD–1: Start Mosquitto Broker
+Step 4️⃣: Stop Existing Mosquitto Service
 
-Wi-Fi connection status
+Open CMD as Administrator.
 
-MQTT broker connection status
+Run:
 
-Step 11: Start MQTT Broker
+net stop mosquitto
 
-Start the Mosquitto MQTT broker on the laptop/PC.
+Step 5️⃣: Kill Any Running Mosquitto Process
 
-Step 12: Control and Monitor
+Check for running Mosquitto processes:
 
-Use MQTT commands:
+tasklist | findstr mosquitto
 
-mosquitto_sub to subscribe to telemetry data
 
-mosquitto_pub to publish ON or OFF messages
+If found, kill the process:
 
-The ESP32 receives MQTT messages, controls the LED accordingly, and publishes telemetry data.
+taskkill /F /IM mosquitto.exe
+
+Step 6️⃣: Start Mosquitto with Config File
+
+Navigate to the Mosquitto directory:
+
+cd "C:\Program Files\mosquitto"
+
+
+Start Mosquitto:
+
+mosquitto -v -c "C:\Program Files\mosquitto\mosquitto.conf"
+
+
+Expected Output:
+
+mosquitto version 2.0.22 starting
+Config loaded from C:\Program Files\mosquitto\mosquitto.conf.
+Opening ipv4 listen socket on port 1883.
+Opening ipv6 listen socket on port 1883.
+
+CMD–2: Verify Broker Status
+Step 7️⃣: Verify Listening Address
+
+Open a new Command Prompt.
+
+Run:
+
+netstat -ano | findstr 1883
+
+
+Expected Output:
+
+TCP 0.0.0.0:1883   LISTENING
+
+
+✅ If this appears, the broker is ready for ESP32 connection.
+
+Step 8️⃣: Start Subscriber (Test Topic)
+
+In the same CMD window, run:
+
+mosquitto_sub -h <PC_IP_ADDRESS> -t test
+
+
+The command will wait for messages (no output initially).
+
+CMD–3: Test Publisher
+Step 9️⃣: Publish Test Message
+
+Open another Command Prompt.
+
+Navigate to Mosquitto folder:
+
+cd "C:\Program Files\mosquitto"
+
+
+Publish a message:
+
+mosquitto_pub -h <PC_IP_ADDRESS> -t test -m hello
+
+Step 🔟: Verify Message Reception
+
+Switch back to CMD–2 (Subscriber).
+
+You should see:
+
+test hello
+
+
+✅ This confirms that publisher and subscriber are working correctly using the Mosquitto broker.
+
+Internal LED ON / OFF Control (ESP32)
+Step 1️⃣1️⃣: Subscribe to LED Control Topic
+
+In CMD–2, run:
+
+mosquitto_sub -h <PC_IP_ADDRESS> -t cdac/diot/led/control
+
+Step 1️⃣2️⃣: Turn ON Internal LED
+
+In CMD–3, run:
+
+mosquitto_pub -h <PC_IP_ADDRESS> -t cdac/diot/led/control -m ON
+
+
+🔹 Result: Internal LED on ESP32 turns ON.
+
+Step 1️⃣3️⃣: Turn OFF Internal LED
+
+In CMD–3, run:
+
+mosquitto_pub -h <PC_IP_ADDRESS> -t cdac/diot/led/control -m OFF
+
+
+🔹 Result: Internal LED on ESP32 turns OFF.
 
 Final Result
 
-The ESP32 successfully communicates over Wi-Fi, connects to the MQTT broker, publishes telemetry data, and performs LED control based on received MQTT commands.
+Mosquitto broker configured successfully
+
+Publisher and subscriber communication verified
+
+ESP32 connected to MQTT broker
+
+Internal LED controlled using MQTT ON / OFF commands
