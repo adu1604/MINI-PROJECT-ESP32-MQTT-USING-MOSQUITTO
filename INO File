@@ -1,0 +1,114 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include "config.h"
+#define LED_PIN 2
+/* WiFi & MQTT Clients */
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+/* Timers */
+unsigned long lastPublish = 0;
+const long publishInterval = 5000;
+
+/* ---------------- WiFi Connect ---------------- */
+void connectWiFi()
+{
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi Connected");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+}
+
+/* ---------------- MQTT Callback ---------------- */
+void handleIncomingMessage(char* topic, byte* payload, unsigned int length)
+{
+  payload[length] = '\0';
+  String message = String((char*)payload);
+
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] : ");
+  Serial.println(message);
+
+  if (String(topic) == MQTT_TOPIC_SUBSCRIBE) {
+    if (message == "ON") {
+      digitalWrite(LED_PIN, HIGH);
+      Serial.println("LED ON");
+    } 
+    else if (message == "OFF") {
+      digitalWrite(LED_PIN, LOW);
+      Serial.println("LED OFF");
+    }
+  }
+}
+
+/* ---------------- MQTT Connect ---------------- */
+void connectMQTT()
+{
+  while (!client.connected()) {
+    Serial.print("Connecting to MQTT... ");
+
+    if (client.connect(MQTT_CLIENT_ID)) {
+      Serial.println("Connected");
+      client.subscribe(MQTT_TOPIC_SUBSCRIBE);
+      Serial.println("Subscribed to LED control topic");
+    } else {
+      Serial.print("Failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" retrying in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
+/* ---------------- Publish Telemetry ---------------- */
+void publishTelemetry()
+{
+  StaticJsonDocument<200> doc;
+  doc["device"] = "ESP32";
+  doc["led"] = digitalRead(LED_PIN);
+  doc["uptime"] = millis() / 1000;
+
+  char buffer[256];
+  serializeJson(doc, buffer);
+
+  client.publish(MQTT_TOPIC_PUBLISH, buffer);
+  Serial.println("Telemetry Published");
+}
+
+/* ---------------- SETUP ---------------- */
+void setup()
+{
+  Serial.begin(115200);
+
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+
+  connectWiFi();
+
+  client.setServer(MQTT_BROKER, MQTT_PORT);
+  client.setCallback(handleIncomingMessage);
+}
+
+/* ---------------- LOOP ---------------- */
+void loop()
+{
+  if (!client.connected()) {
+    connectMQTT();
+  }
+
+  client.loop();
+
+  if (millis() - lastPublish > publishInterval) {
+    lastPublish = millis();
+    publishTelemetry();
+  }
+}
